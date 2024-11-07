@@ -18,6 +18,6 @@ function createButton(
 }
 
 const button = createButton("click me!", () => {
-  alert("WOW! you've clicked a button");
+  alert("you've clicked a button");
 });
 app.append(button);
