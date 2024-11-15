@@ -78,17 +78,20 @@ let points = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
 statusPanel.innerHTML = "No points yet...";
 
+const NULL_ISLAND = { lat: 0, lng: 0 };
+const originI = Math.floor(lectureHall.lat / gameSetting.tileDegrees);
+const originJ = Math.floor(lectureHall.lng / gameSetting.tileDegrees);
+
 /*  Generates a rectangular cache at (i,j)  */
 function spawnCache(i: number, j: number) {
-  const origin = lectureHall;
   const bounds = leaflet.latLngBounds([
     [
-      origin.lat + i * gameSetting.tileDegrees,
-      origin.lng + j * gameSetting.tileDegrees,
+      NULL_ISLAND.lat + i * gameSetting.tileDegrees,
+      NULL_ISLAND.lng + j * gameSetting.tileDegrees,
     ],
     [
-      origin.lat + (i + 1) * gameSetting.tileDegrees,
-      origin.lng + (j + 1) * gameSetting.tileDegrees,
+      NULL_ISLAND.lat + (i + 1) * gameSetting.tileDegrees,
+      NULL_ISLAND.lng + (j + 1) * gameSetting.tileDegrees,
     ],
   ]);
 
@@ -116,13 +119,13 @@ function spawnCache(i: number, j: number) {
 
 /*  Populate the cache in an area given certain condition  */
 for (
-  let i = -gameSetting.neighborhoodSize;
-  i < gameSetting.neighborhoodSize;
+  let i = originI - gameSetting.neighborhoodSize;
+  i < originI + gameSetting.neighborhoodSize;
   i++
 ) {
   for (
-    let j = -gameSetting.neighborhoodSize;
-    j < gameSetting.neighborhoodSize;
+    let j = originJ - gameSetting.neighborhoodSize;
+    j < originJ + gameSetting.neighborhoodSize;
     j++
   ) {
     if (luck([i, j].toString()) < gameSetting.cacheSpawnProbability) {
