@@ -142,6 +142,7 @@ function createMap(center: leaflet.LatLng) {
     maxZoom: config.maxZoomLevel,
     zoomControl: false,
     scrollWheelZoom: false,
+    dragging: false,
   });
 
   leaflet
