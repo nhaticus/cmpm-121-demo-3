@@ -5,6 +5,7 @@ import leaflet from "leaflet";
 import "./leafletWorkaround.ts";
 
 import luck from "./luck.ts";
+import { Board } from "./board.ts";
 // import { LeafletKeyboardEvent, popup } from "npm:@types/leaflet@^1.9.14";
 
 /*  Creating the title  */
@@ -198,9 +199,6 @@ function inventoryUpdated() {
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
 statusPanel.innerHTML = "No coins yet...";
 
-const originI = Math.floor(lectureHall.lat / config.tileDegrees);
-const originJ = Math.floor(lectureHall.lng / config.tileDegrees);
-
 /*  Generates a rectangular cache at (i,j)  */
 function initCache(i: number, j: number): Cache {
   const cache: Cache = {
@@ -244,18 +242,11 @@ function createCache(cache: Cache) {
 }
 
 /*  Populate the cache in an area given certain condition  */
-for (
-  let i = originI - config.neighborhoodSize;
-  i < originI + config.neighborhoodSize;
-  i++
-) {
-  for (
-    let j = originJ - config.neighborhoodSize;
-    j < originJ + config.neighborhoodSize;
-    j++
-  ) {
-    if (luck([i, j].toString()) < config.cacheSpawnProbability) {
-      createCache(initCache(i, j));
-    }
+const board: Board = new Board(config.tileDegrees, config.neighborhoodSize);
+const cells = board.getCellsNearPoint(lectureHall);
+
+for (const cell of cells) {
+  if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
+    createCache(initCache(cell.i, cell.j));
   }
 }
