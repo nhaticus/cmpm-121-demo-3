@@ -95,8 +95,6 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
     if (cache.coins.length > 0) {
       const coin = cache.coins[0];
       transportCoin(coin, cache, playerInventory);
-      statusPanel.innerHTML =
-        `You have ${playerInventory.coins.length} coins in your inventory.`;
       popupText.dispatchEvent(cache_changed);
       dispatchEvent(inventory_changed);
 
@@ -114,8 +112,6 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
     if (playerInventory.coins.length > 0) {
       const coin = playerInventory.coins[playerInventory.coins.length - 1];
       transportCoin(coin, playerInventory, cache);
-      statusPanel.innerHTML =
-        `You have ${playerInventory.coins.length} coins in your inventory.`;
       popupText.dispatchEvent(cache_changed);
       dispatchEvent(inventory_changed);
 
@@ -194,10 +190,6 @@ function inventoryUpdated() {
   }
   inventoryPanel.appendChild(coinsContainer);
 }
-
-/*  Player points  */
-const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
-statusPanel.innerHTML = "No coins yet...";
 
 /*  Generates a rectangular cache at (i,j)  */
 function initCache(i: number, j: number): Cache {
