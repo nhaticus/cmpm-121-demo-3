@@ -8,7 +8,6 @@ import luck from "./luck.ts";
 // import { LeafletKeyboardEvent, popup } from "npm:@types/leaflet@^1.9.14";
 
 /*  Creating the title  */
-// const app = document.querySelector<HTMLDivElement>("#app")!;
 const APP_NAME = "Geocoin Carrier";
 document.title = APP_NAME;
 
@@ -26,11 +25,6 @@ function createButton(
   tmpButton.addEventListener("click", eventHandler);
   return tmpButton;
 }
-
-/* Helper function to convert coordinates */
-// function convertCoords(i: number, j: number): leaflet.LatLng {
-//   return leaflet.latLng(i * config.tileDegrees, j * config.tileDegrees);
-// }
 
 /*  Configurations for leaflet  */
 interface Config {
@@ -96,7 +90,7 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
   }
   popupText.appendChild(coinsContainer);
 
-  const transportButton = createButton("Collect", () => {
+  const collectButton = createButton("Collect", () => {
     if (cache.coins.length > 0) {
       const coin = cache.coins[0];
       transportCoin(coin, cache, playerInventory);
@@ -104,9 +98,38 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
         `You have ${playerInventory.coins.length} coins in your inventory.`;
       popupText.dispatchEvent(cache_changed);
       dispatchEvent(inventory_changed);
+
+      // Update the coins container after collecting a coin
+      coinsContainer.innerHTML = "";
+      for (const remainingCoin of cache.coins) {
+        const coinElement: HTMLElement = document.createElement("li");
+        coinElement.innerHTML = remainingCoin.description;
+        coinsContainer.appendChild(coinElement);
+      }
     }
   });
-  popupText.appendChild(transportButton);
+
+  const depositButton = createButton("Deposit", () => {
+    if (playerInventory.coins.length > 0) {
+      const coin = playerInventory.coins[playerInventory.coins.length - 1];
+      transportCoin(coin, playerInventory, cache);
+      statusPanel.innerHTML =
+        `You have ${playerInventory.coins.length} coins in your inventory.`;
+      popupText.dispatchEvent(cache_changed);
+      dispatchEvent(inventory_changed);
+
+      // Update the coins container after depositing a coin
+      coinsContainer.innerHTML = "";
+      for (const remainingCoin of cache.coins) {
+        const coinElement: HTMLElement = document.createElement("li");
+        coinElement.innerHTML = remainingCoin.description;
+        coinsContainer.appendChild(coinElement);
+      }
+    }
+  });
+
+  popupText.appendChild(depositButton);
+  popupText.appendChild(collectButton);
   return popupText;
 }
 
