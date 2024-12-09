@@ -139,15 +139,26 @@ function createControlButtons() {
 }
 
 /*================= Cache/Coins =================*/
-function transportCoin(coin: Coin, from: Cache, to: Cache) {
-  const fromIndex = from.coins.indexOf(coin);
-  if (fromIndex !== -1) {
-    from.coins.splice(fromIndex, 1);
-    to.coins.push(coin);
+// Brace's suggestion's to split transportCoin into two functions making it easier to test/update
+class CoinManager {
+  static transferCoin(coin: Coin, from: Cache, to: Cache) {
+    const fromIndex = from.coins.indexOf(coin);
+    if (fromIndex !== -1) {
+      from.coins.splice(fromIndex, 1);
+      to.coins.push(coin);
+    }
+  }
+
+  static saveCaches(from: Cache, to: Cache) {
     mementos.set(to.key, to.toMemento());
     mementos.set(from.key, from.toMemento());
     saveGame();
   }
+}
+
+function transportCoin(coin: Coin, from: Cache, to: Cache) {
+  CoinManager.transferCoin(coin, from, to);
+  CoinManager.saveCaches(from, to);
 }
 
 function PopupText(cache: Cache): HTMLElement {
