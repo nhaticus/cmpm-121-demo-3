@@ -20,7 +20,7 @@ interface Config {
 
 /*  Coin  */
 interface Coin {
-  readonly serialNumber: string;
+  readonly serialNumber: number;
   position: Cell;
 }
 
@@ -70,7 +70,6 @@ inventoryPanel.innerHTML = "Stash: ";
 
 /*================= Events =================*/
 /*  Events used for updates similar to d2  */
-const cache_changed: Event = new Event("cache changed");
 const inventory_changed: Event = new Event("inventory changed");
 
 const momentos: Map<string, string> = new Map<string, string>();
@@ -98,8 +97,35 @@ function transportCoin(coin: Coin, from: Cache, to: Cache) {
   }
 }
 
-function PopupText(cache: Cache, event: Event): HTMLElement {
-  console.log(event);
+function createMovementButtons() {
+  const upButton = createButton("⬆️", () => {
+    anchor = leaflet.latLng(anchor.lat + config.tileDegrees, anchor.lng);
+    dispatchEvent(playerMoved);
+  });
+  movementEl.appendChild(upButton);
+
+  const downButton = createButton("⬇️", () => {
+    anchor = leaflet.latLng(anchor.lat - config.tileDegrees, anchor.lng);
+    dispatchEvent(playerMoved);
+  });
+
+  movementEl.appendChild(downButton);
+  const leftButton = createButton("⬅️", () => {
+    anchor = leaflet.latLng(anchor.lat, anchor.lng - config.tileDegrees);
+    dispatchEvent(playerMoved);
+  });
+  movementEl.appendChild(leftButton);
+
+  const rightButton = createButton("➡️", () => {
+    anchor = leaflet.latLng(anchor.lat, anchor.lng + config.tileDegrees);
+    dispatchEvent(playerMoved);
+  });
+
+  movementEl.appendChild(rightButton);
+}
+
+function PopupText(cache: Cache): HTMLElement {
+  console.log(cache.coins);
   const popupText = document.createElement("div");
   popupText.innerHTML =
     `<div>This is cache: (${cache.cell.i}:${cache.cell.j})</div>`;
@@ -107,7 +133,8 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
   for (const coin of cache.coins) {
     const coinElement: HTMLElement = document.createElement("li");
 
-    coinElement.innerHTML = coin.serialNumber;
+    coinElement.innerHTML =
+      `Coin at ${coin.position.i}, ${coin.position.j}: #${coin.serialNumber}`;
     coinsContainer.appendChild(coinElement);
   }
   popupText.appendChild(coinsContainer);
@@ -116,13 +143,14 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
     if (cache.coins.length > 0) {
       const coin = cache.coins[0];
       transportCoin(coin, cache, playerInventory);
-      popupText.dispatchEvent(cache_changed);
       dispatchEvent(inventory_changed);
+      console.log(cache.coins);
       // Update the coins container after collecting a coin
       coinsContainer.innerHTML = "";
-      for (const remainingCoin of cache.coins) {
+      for (const coin of cache.coins) {
         const coinElement: HTMLElement = document.createElement("li");
-        coinElement.innerHTML = remainingCoin.serialNumber;
+        coinElement.innerHTML =
+          `Coin at ${coin.position.i}, ${coin.position.j}: #${coin.serialNumber}`;
         coinsContainer.appendChild(coinElement);
       }
     }
@@ -132,14 +160,14 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
     if (playerInventory.coins.length > 0) {
       const coin = playerInventory.coins[playerInventory.coins.length - 1];
       transportCoin(coin, playerInventory, cache);
-      popupText.dispatchEvent(cache_changed);
       dispatchEvent(inventory_changed);
 
       // Update the coins container after depositing a coin
       coinsContainer.innerHTML = "";
-      for (const remainingCoin of cache.coins) {
+      for (const coin of cache.coins) {
         const coinElement: HTMLElement = document.createElement("li");
-        coinElement.innerHTML = remainingCoin.serialNumber;
+        coinElement.innerHTML =
+          `Coin at ${coin.position.i}, ${coin.position.j}: #${coin.serialNumber}`;
         coinsContainer.appendChild(coinElement);
       }
     }
@@ -148,6 +176,18 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
   popupText.appendChild(depositButton);
   popupText.appendChild(collectButton);
   return popupText;
+}
+
+function inventoryUpdated() {
+  inventoryPanel.innerHTML = "Stash: ";
+  const coinsContainer: HTMLElement = document.createElement("div");
+  for (const coin of playerInventory.coins) {
+    const coinText: HTMLElement = document.createElement("li");
+    coinText.innerHTML =
+      `Coin at ${coin.position.i}, ${coin.position.j}: #${coin.serialNumber}`;
+    coinsContainer.appendChild(coinText);
+  }
+  inventoryPanel.appendChild(coinsContainer);
 }
 
 /*  Creating the map  */
@@ -182,35 +222,8 @@ function createPlayerMarker(location: leaflet.LatLng): leaflet.Marker {
   return playerMarker;
 }
 
-function createMovementButtons() {
-  const upButton = createButton("⬆️", () => {
-    anchor = leaflet.latLng(anchor.lat + config.tileDegrees, anchor.lng);
-    dispatchEvent(playerMoved);
-  });
-  movementEl.appendChild(upButton);
-
-  const downButton = createButton("⬇️", () => {
-    anchor = leaflet.latLng(anchor.lat - config.tileDegrees, anchor.lng);
-    dispatchEvent(playerMoved);
-  });
-
-  movementEl.appendChild(downButton);
-  const leftButton = createButton("⬅️", () => {
-    anchor = leaflet.latLng(anchor.lat, anchor.lng - config.tileDegrees);
-    dispatchEvent(playerMoved);
-  });
-  movementEl.appendChild(leftButton);
-
-  const rightButton = createButton("➡️", () => {
-    anchor = leaflet.latLng(anchor.lat, anchor.lng + config.tileDegrees);
-    dispatchEvent(playerMoved);
-  });
-
-  movementEl.appendChild(rightButton);
-}
-
 /*  Generates a rectangular cache at (i,j)  */
-function initCache(i: number, j: number): Cache {
+function initCache(i: number, j: number, exist?: boolean): Cache {
   const cache: Cache = {
     cell: { i: i, j: j },
     coins: [],
@@ -220,27 +233,25 @@ function initCache(i: number, j: number): Cache {
     fromMomento(momento: string) {
       this.coins = JSON.parse(momento);
     },
-    key: `${i}-${j}`,
+    key: [i, j].toString(),
   };
-
-  if (i === 0 && j === 0) {
+  if (exist) {
     return cache;
   }
-
+  if (i === 0 && j === 0) {
+    return cache; // anchor/player
+  }
   let numCoins = Math.floor(luck([i + j].toString()) * 5);
   if (numCoins === 0) {
     numCoins = 1;
   }
-
   for (let k = 0; k < numCoins; k++) {
     cache.coins.push({
-      serialNumber: `coin-${i}:${j}:#${k}`,
+      serialNumber: k,
       position: cache.cell,
     });
   }
-
   momentos.set(cache.key, cache.toMomento());
-
   return cache;
 }
 
@@ -257,26 +268,15 @@ function showCache(cache: Cache) {
   cacheLayer.addLayer(rect);
 
   /*  Creating unique events per cache to update cache individually */
-  const uniqueCacheEvent = new Event(
+  const _uniqueCacheEvent = new Event(
     `cache-changed-${cache.cell.i}-${cache.cell.j}`,
   );
   addEventListener(`cache-changed-${cache.cell.i}-${cache.cell.j}`, () => {
-    rect.setPopupContent(PopupText(cache, uniqueCacheEvent));
+    rect.setPopupContent(PopupText(cache));
   });
   rect.addEventListener("click", () => {
-    rect.bindPopup(PopupText(cache, uniqueCacheEvent)).openPopup();
+    rect.bindPopup(PopupText(cache)).openPopup();
   });
-}
-
-function inventoryUpdated() {
-  inventoryPanel.innerHTML = "Stash: ";
-  const coinsContainer: HTMLElement = document.createElement("div");
-  for (const coin of playerInventory.coins) {
-    const coinText: HTMLElement = document.createElement("li");
-    coinText.innerHTML = `${coin.serialNumber}`;
-    coinsContainer.appendChild(coinText);
-  }
-  inventoryPanel.appendChild(coinsContainer);
 }
 
 /*  Refreshes the cache in area around position  */
@@ -284,35 +284,40 @@ function refreshCache(position: leaflet.LatLng) {
   const cells = board.getCellsNearPoint(position);
 
   for (const cell of cells) {
-    const cacheKey = `${cell.i}-${cell.j}`;
     if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
-      if (!momentos.has(cacheKey)) {
+      if (!momentos.has([cell.i, cell.j].toString())) {
+        console.log("Cache does not exist");
         showCache(initCache(cell.i, cell.j));
       } else {
-        const cache = initCache(cell.i, cell.j);
-        cache.fromMomento(momentos.get(cacheKey)!);
+        console.log("Cache already exists");
+        const cache = initCache(cell.i, cell.j, true);
+        cache.fromMomento(momentos.get([cell.i, cell.j].toString())!);
         showCache(cache);
       }
     }
   }
 }
 
+/*================= Inventory =================*/
 const playerInventory: Cache = initCache(0, 0);
 
 addEventListener("inventory changed", () => {
   inventoryUpdated();
 });
 
+/*================= Cache =================*/
 /*  Populate the cache in an area given certain condition  */
 const board: Board = new Board(config.tileDegrees, config.neighborhoodSize);
+
 refreshCache(playerMarker.getLatLng());
 
 /*================= Player Movement =================*/
+const movementEl = document.querySelector("#movementControl")!;
+createMovementButtons();
+
 const playerMoved = new Event("player moved");
 
 let anchor: leaflet.LatLng = lectureHall;
-const movementEl = document.querySelector("#movementControl")!;
-createMovementButtons();
 
 addEventListener("player moved", () => {
   playerMarker.setLatLng(anchor);
