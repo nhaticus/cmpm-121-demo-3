@@ -35,8 +35,8 @@ interface Cache {
   coins: Coin[];
   cell: Cell;
   key: string;
-  toMomento(): string;
-  fromMomento(momento: string): void;
+  toMemento(): string;
+  fromMemento(memento: string): void;
 }
 
 /*================= Setup =================*/
@@ -72,7 +72,7 @@ inventoryPanel.innerHTML = "Stash: ";
 /*  Events used for updates similar to d2  */
 const inventory_changed: Event = new Event("inventory changed");
 
-const momentos: Map<string, string> = new Map<string, string>();
+const mementos: Map<string, string> = new Map<string, string>();
 
 /*================= Helper Functions =================*/
 /* Creates a button with given a string and callBack function */
@@ -92,8 +92,8 @@ function transportCoin(coin: Coin, from: Cache, to: Cache) {
   if (fromIndex !== -1) {
     from.coins.splice(fromIndex, 1);
     to.coins.push(coin);
-    momentos.set(to.key, to.toMomento());
-    momentos.set(from.key, from.toMomento());
+    mementos.set(to.key, to.toMemento());
+    mementos.set(from.key, from.toMemento());
   }
 }
 
@@ -227,11 +227,11 @@ function initCache(i: number, j: number, exist?: boolean): Cache {
   const cache: Cache = {
     cell: { i: i, j: j },
     coins: [],
-    toMomento() {
+    toMemento() {
       return JSON.stringify(this.coins);
     },
-    fromMomento(momento: string) {
-      this.coins = JSON.parse(momento);
+    fromMemento(memento: string) {
+      this.coins = JSON.parse(memento);
     },
     key: [i, j].toString(),
   };
@@ -251,7 +251,7 @@ function initCache(i: number, j: number, exist?: boolean): Cache {
       position: cache.cell,
     });
   }
-  momentos.set(cache.key, cache.toMomento());
+  mementos.set(cache.key, cache.toMemento());
   return cache;
 }
 
@@ -285,13 +285,13 @@ function refreshCache(position: leaflet.LatLng) {
 
   for (const cell of cells) {
     if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
-      if (!momentos.has([cell.i, cell.j].toString())) {
+      if (!mementos.has([cell.i, cell.j].toString())) {
         console.log("Cache does not exist");
         showCache(initCache(cell.i, cell.j));
       } else {
         console.log("Cache already exists");
         const cache = initCache(cell.i, cell.j, true);
-        cache.fromMomento(momentos.get([cell.i, cell.j].toString())!);
+        cache.fromMemento(mementos.get([cell.i, cell.j].toString())!);
         showCache(cache);
       }
     }
