@@ -6,27 +6,8 @@ import "./leafletWorkaround.ts";
 
 import luck from "./luck.ts";
 import { Board } from "./board.ts";
-// import { LeafletKeyboardEvent, popup } from "npm:@types/leaflet@^1.9.14";
 
-/*  Creating the title  */
-const APP_NAME = "Geocoin Carrier";
-document.title = APP_NAME;
-
-/*  Lecture Hall/spawn location  */
-const lectureHall = leaflet.latLng(36.98949379578401, -122.06277128548504);
-
-/* Creates a button with given a string and callBack function */
-function createButton(
-  buttonText: string,
-  eventHandler: () => void,
-): HTMLButtonElement {
-  const tmpButton = document.createElement("button");
-  tmpButton.innerHTML = buttonText;
-  tmpButton.style.color = "white";
-  tmpButton.addEventListener("click", eventHandler);
-  return tmpButton;
-}
-
+/*================= Interfaces =================*/
 /*  Configurations for leaflet  */
 interface Config {
   zoomLevel: number;
@@ -37,20 +18,10 @@ interface Config {
   cacheSpawnProbability: number;
 }
 
-const config: Config = {
-  zoomLevel: 19,
-  maxZoomLevel: 19,
-  minZoomLevel: 16,
-  tileDegrees: 0.0001,
-  neighborhoodSize: 8,
-  cacheSpawnProbability: 0.1,
-};
-
 /*  Coin  */
 interface Coin {
   readonly serialNumber: string;
   position: Cell;
-  description: string;
 }
 
 /*  Cell  */
@@ -63,17 +34,67 @@ interface Cell {
 interface Cache {
   coins: Coin[];
   cell: Cell;
+  key: string;
+  toMomento(): string;
+  fromMomento(momento: string): void;
 }
 
+/*================= Setup =================*/
+/*  Creating the title  */
+const APP_NAME = "Geocoin Carrier";
+document.title = APP_NAME;
+
+/*  Lecture Hall/spawn location  */
+const lectureHall = leaflet.latLng(36.98949379578401, -122.06277128548504);
+
+const config: Config = {
+  zoomLevel: 19,
+  maxZoomLevel: 19,
+  minZoomLevel: 16,
+  tileDegrees: 0.0001,
+  neighborhoodSize: 8,
+  cacheSpawnProbability: 0.1,
+};
+
+const map = createMap(lectureHall);
+
+const cacheLayer: leaflet.LayerGroup = leaflet.layerGroup().addTo(map);
+
+/*  Player spawn point  */
+const playerMarker: leaflet.Marker = createPlayerMarker(lectureHall);
+
+/*  Player Inventory  */
+const inventoryPanel = document.createElement("div");
+document.body.appendChild(inventoryPanel);
+inventoryPanel.innerHTML = "Stash: ";
+
+/*================= Events =================*/
 /*  Events used for updates similar to d2  */
 const cache_changed: Event = new Event("cache changed");
 const inventory_changed: Event = new Event("inventory changed");
+
+const momentos: Map<string, string> = new Map<string, string>();
+
+/*================= Helper Functions =================*/
+/* Creates a button with given a string and callBack function */
+function createButton(
+  buttonText: string,
+  eventHandler: () => void,
+): HTMLButtonElement {
+  const tmpButton = document.createElement("button");
+  tmpButton.innerHTML = buttonText;
+  tmpButton.style.color = "white";
+  tmpButton.addEventListener("click", eventHandler);
+  return tmpButton;
+}
 
 function transportCoin(coin: Coin, from: Cache, to: Cache) {
   const fromIndex = from.coins.indexOf(coin);
   if (fromIndex !== -1) {
     from.coins.splice(fromIndex, 1);
     to.coins.push(coin);
+    momentos.set(to.key, to.toMomento());
+    momentos.set(from.key, from.toMomento());
   }
 }
 
@@ -86,7 +107,7 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
   for (const coin of cache.coins) {
     const coinElement: HTMLElement = document.createElement("li");
 
-    coinElement.innerHTML = coin.description;
+    coinElement.innerHTML = coin.serialNumber;
     coinsContainer.appendChild(coinElement);
   }
   popupText.appendChild(coinsContainer);
@@ -97,12 +118,11 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
       transportCoin(coin, cache, playerInventory);
       popupText.dispatchEvent(cache_changed);
       dispatchEvent(inventory_changed);
-
       // Update the coins container after collecting a coin
       coinsContainer.innerHTML = "";
       for (const remainingCoin of cache.coins) {
         const coinElement: HTMLElement = document.createElement("li");
-        coinElement.innerHTML = remainingCoin.description;
+        coinElement.innerHTML = remainingCoin.serialNumber;
         coinsContainer.appendChild(coinElement);
       }
     }
@@ -119,7 +139,7 @@ function PopupText(cache: Cache, event: Event): HTMLElement {
       coinsContainer.innerHTML = "";
       for (const remainingCoin of cache.coins) {
         const coinElement: HTMLElement = document.createElement("li");
-        coinElement.innerHTML = remainingCoin.description;
+        coinElement.innerHTML = remainingCoin.serialNumber;
         coinsContainer.appendChild(coinElement);
       }
     }
@@ -153,42 +173,39 @@ function createMap(center: leaflet.LatLng) {
   return map;
 }
 
-/*  Player */
-function createPlayerMarker(location: leaflet.LatLng) {
+/*  Creating player/user marker */
+function createPlayerMarker(location: leaflet.LatLng): leaflet.Marker {
   const playerMarker = leaflet.marker(location);
   playerMarker.bindTooltip("You are here!");
   playerMarker.addTo(map);
+  return playerMarker;
 }
 
-const map = createMap(lectureHall);
+function createMovementButtons() {
+  const upButton = createButton("⬆️", () => {
+    anchor = leaflet.latLng(anchor.lat + config.tileDegrees, anchor.lng);
+    dispatchEvent(playerMoved);
+  });
+  movementEl.appendChild(upButton);
 
-/*  Player spawn point  */
-createPlayerMarker(lectureHall);
+  const downButton = createButton("⬇️", () => {
+    anchor = leaflet.latLng(anchor.lat - config.tileDegrees, anchor.lng);
+    dispatchEvent(playerMoved);
+  });
 
-/*  Player Inventory  */
-const inventoryPanel = document.createElement("div");
-document.body.appendChild(inventoryPanel);
-inventoryPanel.innerHTML = "Stash: ";
+  movementEl.appendChild(downButton);
+  const leftButton = createButton("⬅️", () => {
+    anchor = leaflet.latLng(anchor.lat, anchor.lng - config.tileDegrees);
+    dispatchEvent(playerMoved);
+  });
+  movementEl.appendChild(leftButton);
 
-const playerInventory: Cache = {
-  coins: [],
-  cell: { i: 0, j: 0 },
-};
+  const rightButton = createButton("➡️", () => {
+    anchor = leaflet.latLng(anchor.lat, anchor.lng + config.tileDegrees);
+    dispatchEvent(playerMoved);
+  });
 
-addEventListener("inventory changed", () => {
-  console.log("inventory changed");
-  inventoryUpdated();
-});
-
-function inventoryUpdated() {
-  inventoryPanel.innerHTML = "Stash: ";
-  const coinsContainer: HTMLElement = document.createElement("div");
-  for (const coin of playerInventory.coins) {
-    const coinText: HTMLElement = document.createElement("li");
-    coinText.innerHTML = coin.description;
-    coinsContainer.appendChild(coinText);
-  }
-  inventoryPanel.appendChild(coinsContainer);
+  movementEl.appendChild(rightButton);
 }
 
 /*  Generates a rectangular cache at (i,j)  */
@@ -196,22 +213,38 @@ function initCache(i: number, j: number): Cache {
   const cache: Cache = {
     cell: { i: i, j: j },
     coins: [],
+    toMomento() {
+      return JSON.stringify(this.coins);
+    },
+    fromMomento(momento: string) {
+      this.coins = JSON.parse(momento);
+    },
+    key: `${i}-${j}`,
   };
+
+  if (i === 0 && j === 0) {
+    return cache;
+  }
+
   let numCoins = Math.floor(luck([i + j].toString()) * 5);
   if (numCoins === 0) {
     numCoins = 1;
   }
+
   for (let k = 0; k < numCoins; k++) {
     cache.coins.push({
-      serialNumber: `coin-${i}-${j}-${k}`,
+      serialNumber: `coin-${i}:${j}:#${k}`,
       position: cache.cell,
-      description: `coin at (${i}, ${j}): #${k}`,
     });
   }
+
+  momentos.set(cache.key, cache.toMomento());
+
   return cache;
 }
 
-function createCache(cache: Cache) {
+/*  populates the cache on the map  */
+function showCache(cache: Cache) {
   const rect = leaflet.rectangle([
     [cache.cell.i * config.tileDegrees, cache.cell.j * config.tileDegrees],
     [
@@ -220,6 +253,7 @@ function createCache(cache: Cache) {
     ],
   ]);
   rect.addTo(map);
+  cacheLayer.addLayer(rect);
 
   /*  Creating unique events per cache to update cache individually */
   const uniqueCacheEvent = new Event(
@@ -233,12 +267,61 @@ function createCache(cache: Cache) {
   });
 }
 
-/*  Populate the cache in an area given certain condition  */
-const board: Board = new Board(config.tileDegrees, config.neighborhoodSize);
-const cells = board.getCellsNearPoint(lectureHall);
+function inventoryUpdated() {
+  inventoryPanel.innerHTML = "Stash: ";
+  const coinsContainer: HTMLElement = document.createElement("div");
+  for (const coin of playerInventory.coins) {
+    const coinText: HTMLElement = document.createElement("li");
+    coinText.innerHTML = `${coin.serialNumber}`;
+    coinsContainer.appendChild(coinText);
+  }
+  inventoryPanel.appendChild(coinsContainer);
+}
 
-for (const cell of cells) {
-  if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
-    createCache(initCache(cell.i, cell.j));
+/*  Refreshes the cache in area around position  */
+function refreshCache(position: leaflet.LatLng) {
+  const cells = board.getCellsNearPoint(position);
+
+  for (const cell of cells) {
+    const cacheKey = `${cell.i}-${cell.j}`;
+    if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
+      if (!momentos.has(cacheKey)) {
+        console.log(`does not have ${cacheKey}`);
+        showCache(initCache(cell.i, cell.j));
+      }
+    } else {
+      const momento = momentos.get(cacheKey);
+      if (momento !== undefined) {
+        console.log("momento", momento);
+        const cache = initCache(cell.i, cell.j);
+        cache.fromMomento(momento);
+        showCache(cache);
+      }
+    }
   }
 }
+
+const playerInventory: Cache = initCache(0, 0);
+
+addEventListener("inventory changed", () => {
+  inventoryUpdated();
+});
+
+/*  Populate the cache in an area given certain condition  */
+const board: Board = new Board(config.tileDegrees, config.neighborhoodSize);
+refreshCache(playerMarker.getLatLng());
+
+/*================= Player Movement =================*/
+const playerMoved = new Event("player moved");
+
+let anchor: leaflet.LatLng = lectureHall;
+const movementEl = document.querySelector("#movementControl")!;
+createMovementButtons();
+
+addEventListener("player moved", () => {
+  playerMarker.setLatLng(anchor);
+  map.setView(anchor, config.zoomLevel);
+
+  cacheLayer.clearLayers();
+  refreshCache(playerMarker.getLatLng());
+});
