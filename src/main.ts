@@ -160,6 +160,7 @@ function createMap(center: leaflet.LatLng) {
     zoomControl: false,
     scrollWheelZoom: false,
     dragging: false,
+    doubleClickZoom: false,
   });
 
   leaflet
@@ -288,13 +289,9 @@ function refreshCache(position: leaflet.LatLng) {
       if (!momentos.has(cacheKey)) {
         console.log(`does not have ${cacheKey}`);
         showCache(initCache(cell.i, cell.j));
-      }
-    } else {
-      const momento = momentos.get(cacheKey);
-      if (momento !== undefined) {
-        console.log("momento", momento);
+      } else {
         const cache = initCache(cell.i, cell.j);
-        cache.fromMomento(momento);
+        cache.fromMomento(momentos.get(cacheKey)!);
         showCache(cache);
       }
     }
@@ -321,7 +318,6 @@ createMovementButtons();
 addEventListener("player moved", () => {
   playerMarker.setLatLng(anchor);
   map.setView(anchor, config.zoomLevel);
-
   cacheLayer.clearLayers();
   refreshCache(playerMarker.getLatLng());
 });
