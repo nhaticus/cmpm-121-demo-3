@@ -287,7 +287,6 @@ function refreshCache(position: leaflet.LatLng) {
     const cacheKey = `${cell.i}-${cell.j}`;
     if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
       if (!momentos.has(cacheKey)) {
-        console.log(`does not have ${cacheKey}`);
         showCache(initCache(cell.i, cell.j));
       } else {
         const cache = initCache(cell.i, cell.j);
