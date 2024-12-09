@@ -74,7 +74,7 @@ const inventory_changed: Event = new Event("inventory changed");
 
 const mementos: Map<string, string> = new Map<string, string>();
 
-/*================= Helper Functions =================*/
+/*================= Buttons =================*/
 /* Creates a button with given a string and callBack function */
 function createButton(
   buttonText: string,
@@ -87,18 +87,14 @@ function createButton(
   return tmpButton;
 }
 
-function transportCoin(coin: Coin, from: Cache, to: Cache) {
-  const fromIndex = from.coins.indexOf(coin);
-  if (fromIndex !== -1) {
-    from.coins.splice(fromIndex, 1);
-    to.coins.push(coin);
-    mementos.set(to.key, to.toMemento());
-    mementos.set(from.key, from.toMemento());
-  }
-}
-
 function createControlButtons() {
   const geoLocationButton = createButton("🌐", () => {
+    followLoc = !followLoc;
+    if (followLoc) {
+      alert("Geolocation tracking started");
+    } else {
+      alert("Geolocation tracking stopped");
+    }
     navigator.geolocation.getCurrentPosition((position) => {
       anchor = leaflet.latLng(
         position.coords.latitude,
@@ -131,12 +127,30 @@ function createControlButtons() {
     anchor = leaflet.latLng(anchor.lat, anchor.lng + config.tileDegrees);
     dispatchEvent(playerMoved);
   });
-
   movementEl.appendChild(rightButton);
+
+  const trashDataButton = createButton("🚮", () => {
+    if (prompt("Are you sure you want to delete all data? (y/n)") === "y") {
+      localStorage.clear();
+      location.reload();
+    }
+  });
+  movementEl.appendChild(trashDataButton);
+}
+
+/*================= Cache/Coins =================*/
+function transportCoin(coin: Coin, from: Cache, to: Cache) {
+  const fromIndex = from.coins.indexOf(coin);
+  if (fromIndex !== -1) {
+    from.coins.splice(fromIndex, 1);
+    to.coins.push(coin);
+    mementos.set(to.key, to.toMemento());
+    mementos.set(from.key, from.toMemento());
+    saveGame();
+  }
 }
 
 function PopupText(cache: Cache): HTMLElement {
-  console.log(cache.coins);
   const popupText = document.createElement("div");
   popupText.innerHTML =
     `<div>This is cache: (${cache.cell.i}:${cache.cell.j})</div>`;
@@ -155,7 +169,6 @@ function PopupText(cache: Cache): HTMLElement {
       const coin = cache.coins[0];
       transportCoin(coin, cache, playerInventory);
       dispatchEvent(inventory_changed);
-      console.log(cache.coins);
       // Update the coins container after collecting a coin
       coinsContainer.innerHTML = "";
       for (const coin of cache.coins) {
@@ -196,41 +209,13 @@ function inventoryUpdated() {
     const coinText: HTMLElement = document.createElement("li");
     coinText.innerHTML =
       `Coin at ${coin.position.i}, ${coin.position.j}: #${coin.serialNumber}`;
+    coinText.addEventListener("click", () => {
+      console.log(coin.position.i, coin.position.j);
+      moveTo(coin.position.i, coin.position.j);
+    });
     coinsContainer.appendChild(coinText);
   }
   inventoryPanel.appendChild(coinsContainer);
-}
-
-/*  Creating the map  */
-function createMap(center: leaflet.LatLng) {
-  const map = leaflet.map(document.getElementById("map")!, {
-    center: center,
-    zoom: config.zoomLevel,
-    minZoom: config.minZoomLevel,
-    maxZoom: config.maxZoomLevel,
-    zoomControl: false,
-    scrollWheelZoom: false,
-    dragging: false,
-    doubleClickZoom: false,
-  });
-
-  leaflet
-    .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: config.maxZoomLevel,
-      attribution:
-        '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    })
-    .addTo(map);
-
-  return map;
-}
-
-/*  Creating player/user marker */
-function createPlayerMarker(location: leaflet.LatLng): leaflet.Marker {
-  const playerMarker = leaflet.marker(location);
-  playerMarker.bindTooltip("You are here!");
-  playerMarker.addTo(map);
-  return playerMarker;
 }
 
 /*  Generates a rectangular cache at (i,j)  */
@@ -297,16 +282,81 @@ function refreshCache(position: leaflet.LatLng) {
   for (const cell of cells) {
     if (luck([cell.i, cell.j].toString()) < config.cacheSpawnProbability) {
       if (!mementos.has([cell.i, cell.j].toString())) {
-        console.log("Cache does not exist");
         showCache(initCache(cell.i, cell.j));
       } else {
-        console.log("Cache already exists");
         const cache = initCache(cell.i, cell.j, true);
         cache.fromMemento(mementos.get([cell.i, cell.j].toString())!);
         showCache(cache);
       }
     }
   }
+}
+
+/*================= Geolocation =================*/
+function followLocation() {
+  if (followLoc) {
+    navigator.geolocation.getCurrentPosition((position) => {
+      const geoPos = leaflet.latLng(
+        position.coords.latitude,
+        position.coords.longitude,
+      );
+      const distance = geoPos.distanceTo(anchor);
+      if (distance > config.tileDegrees) {
+        anchor = geoPos;
+        dispatchEvent(playerMoved);
+      }
+    });
+  } else {
+    return;
+  }
+}
+
+/* ================== Location Tracking ================== */
+function locationTracking() {
+  if (trackedLocations.length === 0) {
+    trackedLocations.push([anchor]);
+  } else {
+    const lastLocation = trackedLocations[trackedLocations.length - 1];
+    console.log(anchor.distanceTo(lastLocation[lastLocation.length - 1]));
+    if (anchor.distanceTo(lastLocation[lastLocation.length - 1])) {
+      lastLocation.push(anchor);
+    } else {
+      trackedLocations.push([anchor]);
+    }
+  }
+}
+
+/*================= Map =================*/
+/*  Creating the map  */
+function createMap(center: leaflet.LatLng) {
+  const map = leaflet.map(document.getElementById("map")!, {
+    center: center,
+    zoom: config.zoomLevel,
+    minZoom: config.minZoomLevel,
+    maxZoom: config.maxZoomLevel,
+    zoomControl: false,
+    scrollWheelZoom: false,
+    dragging: false,
+    doubleClickZoom: false,
+  });
+
+  leaflet
+    .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: config.maxZoomLevel,
+      attribution:
+        '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    })
+    .addTo(map);
+
+  return map;
+}
+
+/*  Creating player/user marker */
+function createPlayerMarker(location: leaflet.LatLng): leaflet.Marker {
+  const playerMarker = leaflet.marker(location);
+  playerMarker.bindTooltip("You are here!");
+  playerMarker.addTo(map);
+  return playerMarker;
 }
 
 /*================= Inventory =================*/
@@ -323,6 +373,11 @@ const board: Board = new Board(config.tileDegrees, config.neighborhoodSize);
 refreshCache(playerMarker.getLatLng());
 
 /*================= Player Movement =================*/
+function moveTo(i: number, j: number) {
+  anchor = leaflet.latLng(i * config.tileDegrees, j * config.tileDegrees);
+  dispatchEvent(playerMoved);
+}
+
 const movementEl = document.querySelector("#movementControl")!;
 createControlButtons();
 
@@ -331,8 +386,63 @@ const playerMoved = new Event("player moved");
 let anchor: leaflet.LatLng = lectureHall;
 
 addEventListener("player moved", () => {
+  cacheLayer.clearLayers();
   playerMarker.setLatLng(anchor);
   map.setView(anchor, config.zoomLevel);
-  cacheLayer.clearLayers();
+  refreshCache(playerMarker.getLatLng());
+  locationTracking();
+  const polyline = leaflet.polyline(trackedLocations, { color: "red" }).addTo(
+    map,
+  );
+  cacheLayer.addLayer(polyline);
+  saveGame();
+});
+
+/*================= Local Save =================*/
+function saveGame() {
+  localStorage.setItem(
+    "playerPosition",
+    JSON.stringify(playerMarker.getLatLng()),
+  );
+  localStorage.setItem(
+    "mementos",
+    JSON.stringify(Array.from(mementos.entries())),
+  );
+  localStorage.setItem("playerInventory", JSON.stringify(playerInventory));
+}
+
+function loadGame() {
+  if (localStorage.getItem("playerPosition")) {
+    const playerPosition = JSON.parse(localStorage.getItem("playerPosition")!);
+    anchor = leaflet.latLng(playerPosition.lat, playerPosition.lng);
+    playerMarker.setLatLng(anchor);
+    map.setView(anchor, config.zoomLevel);
+  }
+
+  if (localStorage.getItem("playerInventory")) {
+    const playerInventoryData = JSON.parse(
+      localStorage.getItem("playerInventory")!,
+    );
+    playerInventory.coins = playerInventoryData.coins;
+    inventoryUpdated();
+  }
+
+  if (localStorage.getItem("mementos")) {
+    const mementosData = JSON.parse(localStorage.getItem("mementos")!);
+    for (const [key, value] of mementosData) {
+      mementos.set(key, value);
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  loadGame();
+
+  locationTracking();
   refreshCache(playerMarker.getLatLng());
 });
+
+/*================= Main =================*/
+let followLoc: boolean = false;
+const trackedLocations: leaflet.LatLng[][] = [];
+setInterval(followLocation, 1000);
