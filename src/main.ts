@@ -97,7 +97,18 @@ function transportCoin(coin: Coin, from: Cache, to: Cache) {
   }
 }
 
-function createMovementButtons() {
+function createControlButtons() {
+  const geoLocationButton = createButton("🌐", () => {
+    navigator.geolocation.getCurrentPosition((position) => {
+      anchor = leaflet.latLng(
+        position.coords.latitude,
+        position.coords.longitude,
+      );
+      dispatchEvent(playerMoved);
+    });
+  });
+  movementEl.appendChild(geoLocationButton);
+
   const upButton = createButton("⬆️", () => {
     anchor = leaflet.latLng(anchor.lat + config.tileDegrees, anchor.lng);
     dispatchEvent(playerMoved);
@@ -313,7 +324,7 @@ refreshCache(playerMarker.getLatLng());
 
 /*================= Player Movement =================*/
 const movementEl = document.querySelector("#movementControl")!;
-createMovementButtons();
+createControlButtons();
 
 const playerMoved = new Event("player moved");
 
