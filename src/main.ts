@@ -106,30 +106,30 @@ function createGeoLocationButton() {
   movementEl.appendChild(geoLocationButton);
 }
 
-function createDirectionalMovementButton() {
-  const upButton = createButton("⬆️", () => {
-    anchor = leaflet.latLng(anchor.lat + config.tileDegrees, anchor.lng);
+function createDirectionalMovementButton(
+  direction: string,
+  offsetLat: number,
+  offsetLng: number,
+) {
+  return createButton(direction, () => {
+    anchor = leaflet.latLng(anchor.lat + offsetLat, anchor.lng + offsetLng);
     dispatchEvent(playerMoved);
   });
-  movementEl.appendChild(upButton);
+}
 
-  const downButton = createButton("⬇️", () => {
-    anchor = leaflet.latLng(anchor.lat - config.tileDegrees, anchor.lng);
-    dispatchEvent(playerMoved);
-  });
-
-  movementEl.appendChild(downButton);
-  const leftButton = createButton("⬅️", () => {
-    anchor = leaflet.latLng(anchor.lat, anchor.lng - config.tileDegrees);
-    dispatchEvent(playerMoved);
-  });
-  movementEl.appendChild(leftButton);
-
-  const rightButton = createButton("➡️", () => {
-    anchor = leaflet.latLng(anchor.lat, anchor.lng + config.tileDegrees);
-    dispatchEvent(playerMoved);
-  });
-  movementEl.appendChild(rightButton);
+function createDirectionalMovementButtons() {
+  movementEl.appendChild(
+    createDirectionalMovementButton("⬆️", config.tileDegrees, 0),
+  );
+  movementEl.appendChild(
+    createDirectionalMovementButton("⬇️", -config.tileDegrees, 0),
+  );
+  movementEl.appendChild(
+    createDirectionalMovementButton("⬅️", 0, -config.tileDegrees),
+  );
+  movementEl.appendChild(
+    createDirectionalMovementButton("➡️", 0, config.tileDegrees),
+  );
 }
 
 function createTrashDataButton() {
@@ -145,7 +145,7 @@ function createTrashDataButton() {
 function createControlButtons() {
   createGeoLocationButton();
 
-  createDirectionalMovementButton();
+  createDirectionalMovementButtons();
 
   createTrashDataButton();
 }
