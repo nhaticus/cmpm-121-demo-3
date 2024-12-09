@@ -87,7 +87,7 @@ function createButton(
   return tmpButton;
 }
 
-function createControlButtons() {
+function createGeoLocationButton() {
   const geoLocationButton = createButton("🌐", () => {
     followLoc = !followLoc;
     if (followLoc) {
@@ -104,7 +104,9 @@ function createControlButtons() {
     });
   });
   movementEl.appendChild(geoLocationButton);
+}
 
+function createDirectionalMovementButton() {
   const upButton = createButton("⬆️", () => {
     anchor = leaflet.latLng(anchor.lat + config.tileDegrees, anchor.lng);
     dispatchEvent(playerMoved);
@@ -128,7 +130,9 @@ function createControlButtons() {
     dispatchEvent(playerMoved);
   });
   movementEl.appendChild(rightButton);
+}
 
+function createTrashDataButton() {
   const trashDataButton = createButton("🚮", () => {
     if (prompt("Are you sure you want to delete all data? (y/n)") === "y") {
       localStorage.clear();
@@ -136,6 +140,14 @@ function createControlButtons() {
     }
   });
   movementEl.appendChild(trashDataButton);
+}
+
+function createControlButtons() {
+  createGeoLocationButton();
+
+  createDirectionalMovementButton();
+
+  createTrashDataButton();
 }
 
 /*================= Cache/Coins =================*/
@@ -161,6 +173,7 @@ function transportCoin(coin: Coin, from: Cache, to: Cache) {
   CoinManager.saveCaches(from, to);
 }
 
+/*================= Popup Text =================*/
 function PopupText(cache: Cache): HTMLElement {
   const popupText = document.createElement("div");
   popupText.innerHTML =
